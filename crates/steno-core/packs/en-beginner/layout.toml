@@ -1,0 +1,59 @@
+# English (Beginner) steno layout.
+#
+# Steno keys in canonical stroke order (left consonants, vowels + star,
+# right consonants). `bank` decides hyphenation when a stroke has no vowel.
+key = [
+  # left-hand consonants
+  { id = "S-", letter = "S", bank = "left" },
+  { id = "T-", letter = "T", bank = "left" },
+  { id = "K-", letter = "K", bank = "left" },
+  { id = "P-", letter = "P", bank = "left" },
+  { id = "W-", letter = "W", bank = "left" },
+  { id = "H-", letter = "H", bank = "left" },
+  { id = "R-", letter = "R", bank = "left" },
+  # thumbs: vowels + star (star = undo)
+  { id = "A",  letter = "A", bank = "mid" },
+  { id = "O",  letter = "O", bank = "mid" },
+  { id = "*",  letter = "*", bank = "mid" },
+  { id = "E",  letter = "E", bank = "mid" },
+  { id = "U",  letter = "U", bank = "mid" },
+  # right-hand consonants
+  { id = "-F", letter = "F", bank = "right" },
+  { id = "-R", letter = "R", bank = "right" },
+  { id = "-P", letter = "P", bank = "right" },
+  { id = "-B", letter = "B", bank = "right" },
+  { id = "-L", letter = "L", bank = "right" },
+  { id = "-G", letter = "G", bank = "right" },
+  { id = "-T", letter = "T", bank = "right" },
+  { id = "-S", letter = "S", bank = "right" },
+  { id = "-D", letter = "D", bank = "right" },
+  { id = "-Z", letter = "Z", bank = "right" },
+]
+
+# Physical key (platform-neutral name) -> steno key id.
+# Standard Plover-style QWERTY hand position, so any keyboard works.
+[map]
+KeyQ = "S-"
+KeyA = "S-"
+KeyW = "T-"
+KeyS = "K-"
+KeyE = "P-"
+KeyD = "W-"
+KeyR = "H-"
+KeyF = "R-"
+KeyC = "A"
+KeyV = "O"
+KeyT = "*"
+KeyG = "*"
+KeyN = "E"
+KeyM = "U"
+KeyU = "-F"
+KeyJ = "-R"
+KeyI = "-P"
+KeyK = "-B"
+KeyO = "-L"
+KeyL = "-G"
+KeyP = "-T"
+SemiColon = "-S"
+LeftBracket = "-D"
+Quote = "-Z"

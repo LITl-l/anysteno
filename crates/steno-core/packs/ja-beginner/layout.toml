@@ -1,0 +1,42 @@
+# 日本語 (Beginner) steno layout.
+#
+# Same finger geometry as the English pack, but the star's neighbour key is a
+# fifth vowel `I`, so consonant+vowel chords can spell all five kana columns.
+key = [
+  # left-hand consonants
+  { id = "S-", letter = "S", bank = "left" },
+  { id = "T-", letter = "T", bank = "left" },
+  { id = "K-", letter = "K", bank = "left" },
+  { id = "P-", letter = "P", bank = "left" },
+  { id = "W-", letter = "W", bank = "left" },
+  { id = "H-", letter = "H", bank = "left" },
+  { id = "R-", letter = "R", bank = "left" },
+  # thumbs: vowels + star (star = undo)
+  { id = "A",  letter = "A", bank = "mid" },
+  { id = "O",  letter = "O", bank = "mid" },
+  { id = "*",  letter = "*", bank = "mid" },
+  { id = "I",  letter = "I", bank = "mid" },
+  { id = "E",  letter = "E", bank = "mid" },
+  { id = "U",  letter = "U", bank = "mid" },
+  # right-hand consonants (mostly for ん and future extension)
+  { id = "-B", letter = "B", bank = "right" },
+  { id = "-Z", letter = "Z", bank = "right" },
+]
+
+[map]
+KeyQ = "S-"
+KeyA = "S-"
+KeyW = "T-"
+KeyS = "K-"
+KeyE = "P-"
+KeyD = "W-"
+KeyR = "H-"
+KeyF = "R-"
+KeyC = "A"
+KeyV = "O"
+KeyT = "*"
+KeyG = "I"
+KeyN = "E"
+KeyM = "U"
+KeyK = "-B"
+Quote = "-Z"

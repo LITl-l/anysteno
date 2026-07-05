@@ -1,0 +1,5 @@
+code = "ja-beginner"
+name = "日本語 (Beginner)"
+lang = "ja"
+description = "A simplified Japanese kana steno theory: consonant + vowel chords produce hiragana (KA→か, SI→し). Uses the same finger positions as the English pack. Extend with 濁音/半濁音 and more rows via user.json."
+undo_stroke = "*"

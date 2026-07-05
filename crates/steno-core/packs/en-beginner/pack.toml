@@ -1,0 +1,5 @@
+code = "en-beginner"
+name = "English (Beginner)"
+lang = "en"
+description = "A simplified English steno theory for first-time learners: intuitive letter-shaped strokes, a small curated word list, and single-key fingerspelling. Extend it with your own user.json."
+undo_stroke = "*"

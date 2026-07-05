@@ -1,0 +1,15 @@
+[package]
+name = "steno-app"
+description = "anysteno GUI: egui front-end, global key capture, and text injection"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "anysteno"
+path = "src/main.rs"
+
+[dependencies]
+steno-core = { path = "../steno-core" }
