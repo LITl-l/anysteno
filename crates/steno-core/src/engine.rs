@@ -138,6 +138,11 @@ impl Engine {
         self.translator.flush(&self.pack.dict)
     }
 
+    /// Strokes currently buffered awaiting disambiguation (for the live view).
+    pub fn pending(&self) -> &[String] {
+        self.translator.pending()
+    }
+
     /// Steno key ids currently held, in canonical order — for a live GUI view
     /// of the chord being built.
     pub fn held_steno_ids(&self) -> Vec<String> {
