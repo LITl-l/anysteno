@@ -54,7 +54,9 @@ Standard Plover hand position on QWERTY:
 ```
 
 The `en-beginner` pack ships a small curated word list (`cat`, `the`, `world`,
-`stop`, …) plus single-key **fingerspelling** so you can always spell a letter.
+`stop`, …) plus **fingerspelling** for the whole alphabet, so you can always
+spell a letter. Letters with their own steno key are a single press (`S` → `s`);
+the rest use short Plover-style chords (`KR` → `c`, `PH` → `m`, `TPH` → `n`).
 It is intentionally small and intuitive — extend it via `user.json` or swap in a
 full Plover dictionary by writing a pack.
 
@@ -117,8 +119,6 @@ pack:
   letters still reach the focused app *in addition* to the injected translation.
   True suppression needs per-OS grab APIs (Windows/macOS hooks, Linux uinput);
   it is planned. In-app mode is unaffected and fully usable.
-- **Beginner English omits some letters** (c, i, j, m, n, q, v, x, y have no
-  single-key fingerspelling in the tiny default). Add them in `user.json`.
 - **Japanese needs a CJK font.** anysteno auto-loads Noto Sans CJK / system CJK
   fonts if present; otherwise kana render as boxes. Install Noto Sans CJK.
 - **Wayland** global capture depends on the compositor.

@@ -79,6 +79,32 @@ mod tests {
     }
 
     #[test]
+    fn english_pack_can_fingerspell_every_letter() {
+        let p = embedded("en-beginner").unwrap().load().unwrap();
+        // One canonical stroke per letter a–z. Letters with a dedicated steno
+        // key use it directly; the rest use short Plover-style chords so the
+        // whole alphabet is always spellable.
+        let spell = [
+            ('a', "A"), ('b', "-B"), ('c', "KR"), ('d', "-D"),
+            ('e', "E"), ('f', "-F"), ('g', "-G"), ('h', "H"),
+            ('i', "EU"), ('j', "SKWR"), ('k', "K"), ('l', "-L"),
+            ('m', "PH"), ('n', "TPH"), ('o', "O"), ('p', "P"),
+            ('q', "KW"), ('r', "R"), ('s', "S"), ('t', "T"),
+            ('u', "U"), ('v', "SR"), ('w', "W"), ('x', "KP"),
+            ('y', "KWR"), ('z', "-Z"),
+        ];
+        assert_eq!(spell.len(), 26, "every letter must be covered");
+        for (letter, stroke) in spell {
+            let expected = letter.to_string();
+            assert_eq!(
+                p.dict.lookup(stroke),
+                Some(expected.as_str()),
+                "stroke {stroke} should fingerspell {letter}"
+            );
+        }
+    }
+
+    #[test]
     fn shipped_dictionaries_are_self_consistent() {
         // Every dictionary key must render back to itself from its steno keys,
         // i.e. the curated strokes actually match this layout's geometry.
