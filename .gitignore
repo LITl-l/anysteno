@@ -1,6 +1,10 @@
 /target
 **/*.rs.bk
 Cargo.lock.orig
+
+# This workspace ships a binary, so the lockfile IS committed
+# (overrides a global ignore of Cargo.lock).
+!/Cargo.lock
 .direnv/
 result
 result-*
