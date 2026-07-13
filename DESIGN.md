@@ -84,7 +84,7 @@ live view (held keys / last stroke / pending) updates every event
 
 ## Testing
 
-`steno-core` has 35 unit tests covering hyphenation, chord accumulation
+`steno-core` has 36 unit tests covering hyphenation, chord accumulation
 (including staggered/duplicate/reset), greedy multi-stroke translation, pack
 parsing/errors/overlays, and the shipped packs. They need no display and run in
 milliseconds. The GUI/platform layer is thin and validated by launch + manual
