@@ -17,7 +17,8 @@ is identical on every OS.
 ┌──────────────────────────────────────────────────────────┐
 │ steno-app (egui)   screens · keyboard view · routing      │
 ├──────────────────────────────────────────────────────────┤
-│ platform           capture (rdev) · inject (enigo)        │  thin OS shims
+│ platform           capture (rdev grab/listen) · inject     │  thin OS shims
+│                    (enigo: X11 + Wayland)                  │
 ├──────────────────────────────────────────────────────────┤
 │ steno-core         pure engine, NO I/O, NO OS deps        │  fully tested
 │   pack → layout → chord → stroke → dictionary → engine     │
@@ -70,9 +71,13 @@ screen. `steno-core` depends on nothing but `serde`.
 ## Data flow
 
 ```
-key events ─▶ engine.on_key ─▶ EngineOutput ─▶ [StenoEvent] ─▶ active screen
-                                                               ├─ Learn:    judge against the drill target
-                                                               └─ Practice: append, and inject if enabled
+egui events (window focused) ─┐
+rdev grab   (keys consumed)  ─┼─▶ engine.on_key ─▶ EngineOutput ─▶ [StenoEvent]
+rdev listen (keys observed)  ─┘                                         │
+                                        ┌───────────────────────────────┴──┐
+                                        ▼                                  ▼
+                              Learn: judge against            Practice: append to the
+                              the drill target                page, and inject if enabled
 keyboard view (held keys / hint chord) redraws every event
 ```
 
@@ -120,9 +125,23 @@ marked wrong.
 - **Two input paths, one engine.** In-app reads egui's key events (no OS
   permission, no double-typing because no text widget is focused); system-wide
   reads a global `rdev` capture thread and injects via `enigo`.
-- **System-wide does not suppress keys yet.** `rdev::listen` observes but cannot
-  consume events portably; true suppression needs per-OS grab APIs. Shipped as a
-  known limitation rather than faking it.
+- **Suppression by grabbing, with observing as the fallback.** `rdev::grab`
+  consumes the keys it takes: on Linux via evdev (which sits below the display
+  server, so X11 and Wayland behave identically), on Windows a low-level hook,
+  on macOS a `CGEventTap`. All three are gated by the OS, so when permission is
+  missing anysteno drops to `rdev::listen` — observing only — and names the
+  missing permission instead of pretending the keys were held back.
+- **Only the pack's own keys are ever consumed, and the policy fails open.** The
+  decision lives in `capture::Policy`, which is shared with the capture thread
+  and read on every keystroke. Anything unbound — Escape, modifiers, Tab,
+  function keys — always passes through, so a capture cannot trap the user; and
+  a poisoned lock resolves to "pass the key on", because letting a keystroke
+  through is an annoyance while swallowing one is not.
+- **Grab is confirmed by the absence of failure.** It either refuses during
+  setup or blocks forever; there is no success signal. The backend therefore
+  starts as `Starting` and settles to `Suppressing` only after a grace period
+  with no error, rather than being guessed at start-up — a slow refusal would
+  otherwise be read as success and leave no capture running at all.
 - **Extensibility via files, not plugins.** A language is a folder; adding one
   never recompiles the binary. This satisfies "extend itself" and "user
   customizable dictionary" with one mechanism.
@@ -135,6 +154,13 @@ marked wrong.
   rather than guessing from local state and running words together.
 - **Injection is confined to the Practice screen.** A drill's answers appearing
   in whatever window happens to be behind anysteno would be a nasty surprise.
+- **Kana are embedded, kanji are not.** A ~36 KB subset of Noto Sans CJK (CJK
+  punctuation, hiragana, katakana, and the kanji the shipped pack's metadata
+  uses) makes Japanese work on a machine with no fonts installed. A full CJK
+  face is several times the size of the whole binary, so a system font is still
+  preferred when present and is registered ahead of the subset. A unit test
+  asserts, through the same rasterizer egui uses, that every character the
+  shipped packs can emit actually has an outline.
 
 ## Testing
 
@@ -143,8 +169,9 @@ round-trip against rendering, chord accumulation (including
 staggered/duplicate/reset), greedy multi-stroke translation, pack
 parsing/errors/overlays, reverse-index ranking and tie-breaking, curriculum
 generation against both shipped packs, drill state, and statistics. The
-`steno-app` layer adds 4 covering settings migration and progress tracking. They
-need no display and run in milliseconds.
+`steno-app` layer adds 13: settings migration and progress tracking (4), the
+embedded font's coverage of the shipped packs (2), and the suppression policy
+(7). They need no display and run in milliseconds.
 
 Two invariants are asserted against the shipped packs specifically:
 
@@ -156,11 +183,36 @@ Two invariants are asserted against the shipped packs specifically:
 - **every word is taught somewhere** — no dictionary entry may be dropped by
   curriculum generation.
 
+`steno-app` also unit-tests the suppression policy — including that an inactive
+or empty policy consumes nothing, that unbound keys always pass through, and
+that a poisoned lock fails open — because that logic decides whether a
+keystroke reaches the rest of the system, and it is the part of the capture
+path that is ours rather than rdev's.
+
 The GUI layer is thin and validated by launching the app and driving it.
+
+### What is not covered by tests
+
+The OS bindings themselves: `rdev::grab` cannot run without `/dev/input`, and
+enigo's Wayland backend needs a live compositor session. Those paths are
+exercised only by running anysteno on a real desktop. What *is* covered is
+everything around them — the policy that decides what to consume, the fallback
+when grab refuses, and the wording shown for each failure.
 
 ## Build
 
 A Nix `shell.nix`/`flake.nix` provides the Rust toolchain and the Linux system
-libraries (X11/Wayland/GL for egui, XTest for rdev/enigo). Release profile is
-tuned for size (`opt-level="z"`, LTO, `strip`, `panic="abort"`): ~5.0 MB single
+libraries (X11/Wayland/GL for egui, XTest for rdev/enigo, and `libevdev` for the
+suppressing capture backend). Release profile is
+tuned for size (`opt-level="z"`, LTO, `strip`, `panic="abort"`): ~5.2 MB single
 binary.
+
+Key suppression, Wayland injection and built-in kana together cost about 140 KB
+— evdev and the Wayland virtual-keyboard protocol are both small, and the font
+subset is 36 KB.
+
+enigo's desktop-portal (`libei`) backend was enabled during this work and then
+removed: it `unwrap()`s a D-Bus error when no portal is running, which kills the
+app on any machine without one, and `panic = "abort"` makes that unrecoverable.
+It cost a crash on the first switch to system-wide mode and was caught by
+running the app, not by the test suite.

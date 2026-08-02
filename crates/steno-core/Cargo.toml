@@ -1,6 +1,6 @@
 [package]
 name = "steno-core"
-description = "Platform-neutral stenography engine: chording, strokes, dictionaries, language packs"
+description = "Platform-neutral stenography engine: chording, strokes, dictionaries, language packs, and generated lessons"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
