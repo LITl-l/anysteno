@@ -4,9 +4,11 @@
 { pkgs ? import <nixpkgs> { } }:
 
 let
-  # System libraries for eframe/egui (GL, X11/wayland), rdev (X11 XInput/XTest),
-  # and enigo (X11 XTest / libxdo) on Linux.
+  # System libraries for eframe/egui (GL, X11/wayland), rdev (X11 XInput/XTest,
+  # and libevdev for the key-suppressing grab backend), and enigo
+  # (X11 XTest / libxdo) on Linux.
   linuxLibs = with pkgs; [
+    libevdev
     xorg.libX11
     xorg.libXcursor
     xorg.libXrandr

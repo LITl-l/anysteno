@@ -23,6 +23,25 @@
 //! A **language pack** ([`Pack`]) bundles a [`Layout`] + [`Dictionary`] + meta.
 //! Adding a language never requires a recompile — drop a pack folder in the
 //! user config dir. Two official packs ship embedded (see [`defaults`]).
+//!
+//! ## Teaching, not just translating
+//!
+//! Everything needed to *learn* a pack is decidable without a screen, so it
+//! lives here too and is unit-tested alongside the engine:
+//!
+//! * [`reverse`] — the dictionary read backwards ([`ReverseIndex`]): text → the
+//!   strokes that write it, with a deterministic choice when a word has several
+//!   spellings. Backs stroke hints and dictionary search.
+//! * [`lesson`] — [`Curriculum::derive`] generates a progression from a pack
+//!   alone, so a new language needs no hand-written lesson plan; [`Drill`] runs
+//!   one.
+//! * [`stats`] — [`SessionStats`]: words per minute and accuracy. Clock-free —
+//!   the caller supplies elapsed time, keeping `std::time` out of the core.
+//!
+//! [`stroke::parse_stroke`] is the inverse of [`stroke::render_stroke`]: it
+//! recovers the keys a stroke is made of, which is what lets a UI show *which
+//! keys to press* and what makes it checkable that a dictionary entry can be
+//! chorded at all.
 
 pub mod chord;
 pub mod defaults;

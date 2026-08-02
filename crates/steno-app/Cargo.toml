@@ -1,6 +1,6 @@
 [package]
 name = "steno-app"
-description = "anysteno GUI: egui front-end, global key capture, and text injection"
+description = "anysteno GUI: egui front-end, key-suppressing global capture, and text injection"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,6 +11,15 @@ repository.workspace = true
 name = "anysteno"
 path = "src/main.rs"
 
+[features]
+default = ["suppress"]
+# Consume the keys anysteno translates, so the focused application never sees
+# the raw letters. Needs rdev's grab backend, which on Linux pulls in evdev and
+# therefore the `libevdev` system library at build time. Disable it
+# (`--no-default-features`) to build without that dependency; capture then
+# observes keys instead of consuming them.
+suppress = ["rdev/unstable_grab"]
+
 [dependencies]
 steno-core = { path = "../steno-core" }
 serde = { workspace = true }
@@ -18,7 +27,20 @@ serde_json = { workspace = true }
 eframe = { version = "0.29", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 egui = "0.29"
 rdev = "0.5"
-enigo = "0.2"
+# `xdo` is X11; `wayland` adds the virtual-keyboard protocol so text injection
+# also reaches native Wayland clients. enigo tries every enabled backend and
+# keeps whichever connects, so one binary covers both session types.
+#
+# The `libei` (desktop-portal) backend is deliberately NOT enabled: enigo 0.2.1
+# unwraps a zbus error in `linux/libei.rs` when no portal is running, so merely
+# enabling it aborts the whole app on any machine without one. This crate builds
+# with `panic = "abort"` in release, so that panic is not even catchable.
+enigo = { version = "0.2", features = ["wayland"] }
 directories = "5"
 crossbeam-channel = "0.5"
 anyhow = "1"
+
+[dev-dependencies]
+# The rasterizer egui itself uses. Asserting coverage through it (rather than
+# through the font's cmap) is what proves a glyph will actually be drawn.
+ab_glyph = "0.2"

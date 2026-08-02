@@ -12,8 +12,8 @@ ship by default; any language can be added by dropping in a folder of plain
 files.
 
 > Status: the steno engine is complete and fully tested, and the app is a
-> working trainer. System-wide injection works but does not yet *suppress* the
-> raw keystrokes — see [Limitations](#limitations).
+> working trainer. Typing into other applications holds back the raw keystrokes,
+> so only the translation lands — see [Typing into other applications](#typing-into-other-applications).
 
 ---
 
@@ -33,9 +33,12 @@ files.
   chord painted onto the keyboard. "How do I write this?" has an answer.
 - **Any language.** A language is a folder of files (`layout.toml` +
   `dict.json`). Add one without recompiling. Ships with `en-beginner` and
-  `ja-beginner`.
-- **Two output destinations.** Type into anysteno's own page, or inject into
-  whatever application is focused.
+  `ja-beginner` — and Japanese renders on a machine with no fonts installed,
+  because the kana come built in.
+- **Two output destinations.** Type into anysteno's own page, or into whatever
+  application is focused. There the raw letters are held back, so the other app
+  sees the translation and nothing else — where the OS grants the access to do
+  that, and anysteno says plainly when it doesn't.
 - **Customisable dictionaries.** Drop a `user.json` next to any pack to override
   or add entries; your edits never touch the shipped files.
 - **Fast & tiny.** Pure-Rust core, single self-contained binary, no runtime.
@@ -107,14 +110,29 @@ cargo run -p steno-app --release
 On other systems: install Rust, then `cargo run -p steno-app --release`. The
 release binary is a single file at `target/release/anysteno`.
 
-### Platform notes
+On Linux the key-suppressing capture backend needs the `libevdev` headers at
+build time (`libevdev-dev` / `libevdev-devel`; the Nix shell supplies it). To
+build without it, use `cargo build --no-default-features` — capture then
+observes keys rather than consuming them.
 
-| OS | Global capture / injection needs |
-|----|----------------------------------|
-| Linux (X11) | works out of the box |
-| Linux (Wayland) | global capture is limited by the compositor; typing into anysteno always works |
-| macOS | grant **Accessibility** permission to capture and inject |
-| Windows | works; no special permission |
+### Typing into other applications
+
+Learning inside anysteno needs no permissions at all. Typing into *other* apps
+means taking keys from the rest of the system, which every OS gates:
+
+| OS | What it needs |
+|----|---------------|
+| Linux | Read/write on `/dev/input` and `/dev/uinput` — usually `sudo usermod -aG input $USER`, then log back in. Works on X11 and Wayland alike, because it reads below the display server. |
+| macOS | Grant anysteno **Accessibility** permission in System Settings. |
+| Windows | Nothing; works as-is. |
+
+If anysteno cannot get that access it does not fail silently or pretend: it
+falls back to watching keys instead of consuming them, and the Practice screen
+tells you exactly which permission is missing.
+
+Keys anysteno does not chord are *never* taken. Escape, modifiers, Tab, function
+keys and any unbound letter always reach the system, so a capture can't leave
+you unable to switch away.
 
 ## Adding or customising a language
 
@@ -145,15 +163,31 @@ silently ignored. To just add words, create `user.json` in an existing pack:
 Your new words are picked up by the lesson generator, the dictionary search and
 the keyboard view automatically — there is nothing else to update.
 
-## Limitations (this version)
+## Where the edges are
 
-- **System-wide keys are not suppressed yet.** When typing into other apps the
-  raw letters still reach them *in addition* to the injected translation. True
-  suppression needs per-OS grab APIs (Windows/macOS hooks, Linux uinput); it is
-  planned. Typing into anysteno is unaffected and fully usable.
-- **Japanese needs a CJK font.** anysteno auto-loads Noto Sans CJK / system CJK
-  fonts if present; otherwise kana render as boxes. Install Noto Sans CJK.
-- **Wayland** global capture depends on the compositor.
+Nothing here is a "todo" — these are the boundaries of what the surrounding
+systems allow, and anysteno reports each one in place rather than failing
+quietly.
+
+- **Kanji outside the shipped pack.** anysteno embeds a kana subset of Noto Sans
+  CJK (~36 KB), so the Japanese pack renders on a machine with no fonts
+  installed. A pack *you* write using kanji needs a system CJK font, because
+  bundling all ~20,000 of them would cost more than the rest of the binary
+  several times over. Settings says so when no system CJK font is present.
+- **GNOME on Wayland can only be typed into via XWayland.** Injection uses the
+  compositor's `virtual-keyboard-v1` protocol, which wlroots compositors (Sway,
+  Hyprland, river) and KDE implement and GNOME does not. The remaining route for
+  GNOME is the desktop portal, and anysteno does not take it: enigo 0.2.1's
+  portal backend `unwrap()`s a D-Bus error when no portal is running
+  (`linux/libei.rs`), which aborts the process — and because anysteno builds
+  with `panic = "abort"` for size, that is not even catchable. Enabling it was
+  tried and reverted. Under GNOME/Wayland, X11 applications (via XWayland) still
+  receive injected text; native Wayland ones do not. A GNOME session on X11 is
+  unaffected, as are all other compositors.
+- **Keyboards that can't report the chord.** Some membrane keyboards physically
+  cannot report certain 3+ key combinations (they lack n-key rollover). No
+  software can see a keypress the hardware never sends. Short chords are fine on
+  virtually all keyboards, which is what the beginner packs are built from.
 
 ## Architecture
 
@@ -161,7 +195,7 @@ Three layers; the brain has no OS dependencies and is fully unit-tested.
 
 ```
 app (egui)        screens, input routing, output routing
-platform          rdev (capture)  ·  enigo (inject)  — thin OS shims
+platform          rdev grab/listen (capture)  ·  enigo (inject)  — thin OS shims
 steno-core        chord → stroke → dictionary → engine   (pure, tested)
                   + curriculum · reverse index · stats
 ```
@@ -173,8 +207,12 @@ for the full design.
 ## Development
 
 ```sh
-nix-shell --run 'cargo test'      # 93 unit tests
+nix-shell --run 'cargo test'      # 102 unit tests
 nix-shell --run 'cargo clippy --all-targets'
+
+# The build without the key-suppressing backend is supported too, so it is
+# worth linting as well.
+nix-shell --run 'cargo clippy -p steno-app --no-default-features --all-targets'
 ```
 
 ## License

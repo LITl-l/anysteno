@@ -13,9 +13,11 @@
 
         # System libraries needed at build & run time on Linux for:
         #   - eframe/egui (windowing, GL, wayland/X11)
-        #   - rdev       (global key capture: X11 XInput/XTest)
+        #   - rdev       (global key capture: X11 XInput/XTest; libevdev for the
+        #                 key-suppressing grab backend)
         #   - enigo      (text injection: X11 XTest / libxdo)
         linuxLibs = with pkgs; [
+          libevdev
           xorg.libX11
           xorg.libXcursor
           xorg.libXrandr

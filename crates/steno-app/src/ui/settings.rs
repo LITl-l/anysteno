@@ -19,15 +19,30 @@ pub struct SettingsAction {
     pub reset_progress: bool,
 }
 
+/// The read-only state Settings reports on but does not own.
+pub struct Env<'a> {
+    pub packs: &'a [Pack],
+    pub active: &'a Pack,
+    /// Packs that failed to load, and why.
+    pub warnings: &'a [String],
+    /// Font coverage note, empty when there is nothing to say.
+    pub font_status: &'a str,
+    pub paths: &'a Paths,
+}
+
 pub fn show(
     ui: &mut egui::Ui,
     theme: &Theme,
-    packs: &[Pack],
-    active: &Pack,
-    warnings: &[String],
-    paths: &Paths,
+    env: &Env<'_>,
     settings: &mut Settings,
 ) -> SettingsAction {
+    let Env {
+        packs,
+        active,
+        warnings,
+        font_status,
+        paths,
+    } = *env;
     let mut action = SettingsAction::default();
 
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -67,6 +82,11 @@ pub fn show(
                     active.undo_stroke
                 ),
             );
+
+            if !font_status.is_empty() {
+                ui.add_space(SPACE_SM);
+                muted(ui, theme, font_status);
+            }
 
             // A pack may bind a key this app has no picture of.
             let missing = keyboard::unrendered_keys(&active.layout);

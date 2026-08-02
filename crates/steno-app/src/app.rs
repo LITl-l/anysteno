@@ -8,7 +8,6 @@
 //! active screen consumes. Screens therefore never touch the engine, the
 //! capture thread or the injector — they see a list of things that happened.
 
-use crossbeam_channel::Receiver;
 use eframe::egui;
 use steno_core::{Curriculum, Engine, KeyEvent, Pack, ReverseIndex, Translation};
 
@@ -70,7 +69,7 @@ pub struct StenoApp {
     curriculum: Curriculum,
     index: ReverseIndex,
 
-    capture_rx: Option<Receiver<KeyEvent>>,
+    capture: Option<capture::Capture>,
     injector: Option<Injector>,
 
     /// Text written on the Practice screen, kept in chunks so undo removes
@@ -121,7 +120,7 @@ impl StenoApp {
             warnings,
             curriculum,
             index,
-            capture_rx: None,
+            capture: None,
             injector: None,
             output: Vec::new(),
             learn: LearnState::default(),
@@ -220,6 +219,37 @@ impl StenoApp {
 
     // --- input ----------------------------------------------------------
 
+    /// What to tell the user about key suppression.
+    fn suppression_status(&self) -> capture::Status {
+        match &self.capture {
+            None => capture::Status::NotStarted,
+            Some(c) => c.status(),
+        }
+    }
+
+    /// Tell the capture thread which keys to take, if any.
+    ///
+    /// Called every frame while capturing so the policy can never be left
+    /// stale: switching pack, disabling translation or leaving system-wide mode
+    /// all release the keyboard on the very next frame.
+    fn sync_suppression(&self, wanted: bool) {
+        let Some(capture) = &self.capture else {
+            return;
+        };
+        let active = wanted && self.settings.enabled;
+        if active {
+            let layout = &self.engine.pack().layout;
+            let keys = layout
+                .order()
+                .iter()
+                .flat_map(|k| layout.physical_keys_for(&k.id))
+                .map(str::to_string)
+                .collect();
+            capture.policy.set_keys(keys);
+        }
+        capture.policy.set_active(active);
+    }
+
     /// Collect this frame's engine output.
     fn pump(
         &mut self,
@@ -230,16 +260,31 @@ impl StenoApp {
         let mut events = Vec::new();
 
         if system_wide {
-            if self.capture_rx.is_none() {
-                self.capture_rx = Some(capture::spawn());
+            if self.capture.is_none() {
+                self.capture = Some(capture::spawn());
                 match Injector::new() {
                     Ok(injector) => self.injector = Some(injector),
                     Err(e) => self.status = e.to_string(),
                 }
             }
+            // Grab reports a refusal asynchronously, so the backend is settled
+            // here rather than guessed at start-up.
+            if let Some(c) = self.capture.as_mut() {
+                c.poll();
+                if let Some(note) = c.note() {
+                    let message = format!("keys are not suppressed: {note}");
+                    if self.status != message {
+                        self.status = message;
+                    }
+                }
+            }
+            // Suppression follows the engine: the moment translation is off, or
+            // the user leaves this mode, every key goes back to the OS.
+            self.sync_suppression(true);
+
             let mut batch = Vec::new();
-            if let Some(rx) = &self.capture_rx {
-                while let Ok(ev) = rx.try_recv() {
+            if let Some(c) = &self.capture {
+                while let Ok(ev) = c.events.try_recv() {
                     batch.push(ev);
                 }
             }
@@ -252,10 +297,11 @@ impl StenoApp {
             return events;
         }
 
-        // Not capturing globally: drain anything the thread queued so the
-        // channel can't grow without bound, and drop it.
-        if let Some(rx) = &self.capture_rx {
-            while rx.try_recv().is_ok() {}
+        // Not capturing globally: stop consuming keys immediately, then drain
+        // anything the thread queued so the channel can't grow without bound.
+        self.sync_suppression(false);
+        if let Some(c) = &self.capture {
+            while c.events.try_recv().is_ok() {}
         }
 
         if !wants_keys {
@@ -335,13 +381,6 @@ impl StenoApp {
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                     ui.add_space(SPACE_SM);
-                    if !self.font_status.is_empty() {
-                        ui.label(
-                            egui::RichText::new(&self.font_status)
-                                .font(font::small())
-                                .color(self.theme.muted),
-                        );
-                    }
                     if !self.warnings.is_empty() {
                         ui.label(
                             egui::RichText::new(format!("{} pack issue(s)", self.warnings.len()))
@@ -501,6 +540,7 @@ impl eframe::App for StenoApp {
                     Screen::Practice => {
                         let pending: Vec<String> = self.engine.pending().to_vec();
                         let output = self.output.concat();
+                        let suppression = self.suppression_status();
                         let action = practice::show(
                             ui,
                             &mut self.practice,
@@ -509,6 +549,7 @@ impl eframe::App for StenoApp {
                             &held,
                             &pending,
                             &output,
+                            &suppression,
                             &mut self.settings,
                         );
                         if action.clear {
@@ -526,15 +567,15 @@ impl eframe::App for StenoApp {
                         lookup::show(ui, &mut self.lookup, &self.theme, &pack, &self.index);
                     }
                     Screen::Settings => {
-                        let action = settings_ui::show(
-                            ui,
-                            &self.theme,
-                            &self.packs,
-                            &pack,
-                            &self.warnings,
-                            &self.paths,
-                            &mut self.settings,
-                        );
+                        let env = settings_ui::Env {
+                            packs: &self.packs,
+                            active: &pack,
+                            warnings: &self.warnings,
+                            font_status: &self.font_status,
+                            paths: &self.paths,
+                        };
+                        let action =
+                            settings_ui::show(ui, &self.theme, &env, &mut self.settings);
                         if let Some(i) = action.select_pack {
                             self.set_pack(i);
                         }

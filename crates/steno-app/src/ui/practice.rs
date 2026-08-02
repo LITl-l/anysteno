@@ -13,6 +13,7 @@ use steno_core::{Pack, SessionStats};
 use super::theme::{font, Theme, SPACE_LG, SPACE_MD, SPACE_SM};
 use super::{card, gap, heading, keyboard, muted, stat};
 use crate::app::StenoEvent;
+use crate::platform::capture::Status;
 use crate::state::{Mode, Settings};
 
 /// How many recent strokes the feed keeps.
@@ -97,6 +98,7 @@ pub fn show(
     held: &[String],
     pending: &[String],
     output: &str,
+    suppression: &Status,
     settings: &mut Settings,
 ) -> PracticeAction {
     let mut action = PracticeAction::default();
@@ -128,14 +130,23 @@ pub fn show(
         }
     });
     if settings.mode == Mode::SystemWide {
-        ui.label(
-            egui::RichText::new(
-                "Heads up: the letters you press also reach the other app — anysteno can't \
-                 suppress them yet.",
-            )
-            .font(font::small())
-            .color(theme.mid),
-        );
+        let (text, colour) = match suppression {
+            Status::NotStarted => (
+                "Starting global capture…".to_string(),
+                theme.muted,
+            ),
+            Status::Suppressing => (
+                "Raw keys are held back — the other app sees only the translation.".to_string(),
+                theme.ok,
+            ),
+            Status::Observing(reason) => (
+                format!(
+                    "The letters you press also reach the other app: {reason}."
+                ),
+                theme.mid,
+            ),
+        };
+        ui.label(egui::RichText::new(text).font(font::small()).color(colour));
     }
 
     ui.add_space(SPACE_MD);
