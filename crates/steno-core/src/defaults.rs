@@ -104,26 +104,53 @@ mod tests {
         }
     }
 
+    /// Every shipped dictionary key must be a stroke this layout can actually
+    /// produce. The engine looks up the *rendered* stroke, so a key whose
+    /// letters are out of steno order is dead weight: the user can hold exactly
+    /// the right keys and still get `NoMatch`. This caught four such entries
+    /// (`HELP`, `PEST`, `REST`, `TEST`) — `-S` sorts after `-T` in the right
+    /// bank, so "PEST" renders as "PETS" and never matched.
     #[test]
-    fn shipped_dictionaries_are_self_consistent() {
-        // Every dictionary key must render back to itself from its steno keys,
-        // i.e. the curated strokes actually match this layout's geometry.
-        use crate::stroke::render_stroke;
+    fn every_shipped_stroke_is_chordable() {
+        use crate::stroke::{parse_stroke, render_stroke};
         use std::collections::BTreeSet;
 
         for e in EMBEDDED {
             let pack = e.load().unwrap();
             let order = pack.layout.order();
-            // id lookup by letter+bank is ambiguous, so build id set per key by
-            // re-deriving from the layout: map each stroke back is non-trivial,
-            // so instead assert every physical mapping points at a real key id.
-            let ids: BTreeSet<&str> = order.iter().map(|k| k.id.as_str()).collect();
-            for id in pack.layout.order().iter().map(|k| &k.id) {
-                assert!(ids.contains(id.as_str()));
+            for (key, text) in pack.dict.entries() {
+                for stroke in key.split('/') {
+                    let ids = parse_stroke(order, stroke).unwrap_or_else(|| {
+                        panic!("{}: {key} ({text}) — stroke {stroke:?} uses keys this layout has no way to chord", e.code)
+                    });
+                    let rendered = render_stroke(order, &ids.into_iter().collect::<BTreeSet<_>>());
+                    assert_eq!(
+                        rendered, stroke,
+                        "{}: {key} ({text}) — chording those keys produces {rendered:?}, so {stroke:?} can never be looked up",
+                        e.code
+                    );
+                }
             }
-            // Sanity: rendering the full key set is non-empty.
-            let all: BTreeSet<String> = order.iter().map(|k| k.id.clone()).collect();
-            assert!(!render_stroke(order, &all).is_empty(), "{}", e.code);
+        }
+    }
+
+    /// Physical keys must map onto steno keys the layout actually declares,
+    /// or a keypress resolves to an id that renders as nothing.
+    #[test]
+    fn shipped_layouts_map_only_declared_keys() {
+        for e in EMBEDDED {
+            let pack = e.load().unwrap();
+            let ids: Vec<&str> = pack.layout.order().iter().map(|k| k.id.as_str()).collect();
+            for key in pack.layout.order() {
+                for physical in pack.layout.physical_keys_for(&key.id) {
+                    let mapped = pack.layout.steno_for(physical).expect("mapping exists");
+                    assert!(
+                        ids.contains(&mapped),
+                        "{}: physical {physical} maps to undeclared steno key {mapped}",
+                        e.code
+                    );
+                }
+            }
         }
     }
 }

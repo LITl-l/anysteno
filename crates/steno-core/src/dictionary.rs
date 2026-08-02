@@ -56,6 +56,13 @@ impl Dictionary {
         self.entries.get(key).map(String::as_str)
     }
 
+    /// Every stroke-key → text pair, in unspecified order. Callers needing a
+    /// stable order must sort. This backs the reverse index, the dictionary
+    /// browser and curriculum generation.
+    pub fn entries(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.entries.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
     /// True if `key_with_slash` (which must end in `/`) is the prefix of some
     /// longer multi-stroke entry.
     pub fn is_prefix(&self, key_with_slash: &str) -> bool {

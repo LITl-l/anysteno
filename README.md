@@ -5,14 +5,15 @@ steno typing app for Linux, Windows and macOS — no special hardware, no steno
 machine, just the keyboard you already have.
 
 anysteno turns simultaneous key presses ("chords") into words, the way a
-stenotype does, and shows you exactly what you typed as steno — so it doubles as
-a friendly trainer for beginners. English and Japanese ship by default; any
-language can be added by dropping in a folder of plain files.
+stenotype does. It is built to *teach* that skill: it draws your actual
+keyboard, lights up the keys as you hold them, and drills you through a lesson
+plan it generates from whichever language you're learning. English and Japanese
+ship by default; any language can be added by dropping in a folder of plain
+files.
 
-> Status: first working version. The steno engine is complete and fully tested;
-> the GUI works with in-app practice on all three platforms. System-wide
-> injection works but does not yet *suppress* the raw keystrokes — see
-> [Limitations](#limitations).
+> Status: the steno engine is complete and fully tested, and the app is a
+> working trainer. System-wide injection works but does not yet *suppress* the
+> raw keystrokes — see [Limitations](#limitations).
 
 ---
 
@@ -20,17 +21,39 @@ language can be added by dropping in a folder of plain files.
 
 - **Any keyboard.** Standard QWERTY chording (Plover-style). No n-key-rollover
   keyboard required for short chords.
-- **Any language.** A language is a folder of files (`layout.toml` + `dict.json`).
-  Add one without recompiling. Ships with `en-beginner` and `ja-beginner`.
-- **Two output modes, toggleable at runtime.**
-  - *In-app* — chord inside anysteno's window and watch the translation. Great
-    for learning; works everywhere with no permissions.
-  - *System-wide* — inject translated text into whatever app is focused.
-- **Beginner-friendly.** A live view shows the keys you're holding, the stroke
-  you made, and the word it produced. Unknown chords are shown, never swallowed.
+- **A live keyboard.** The main view is your real keyboard with the steno
+  letters drawn on it, colour-coded by hand, lighting up as you press. It is
+  generated from the active pack, so it is correct for any language.
+- **Lessons that generate themselves.** anysteno derives a progression from a
+  pack's layout and dictionary: introduce a few keys, then drill the words those
+  keys can now reach. Adding a language gets you a curriculum for free — you
+  never write a lesson plan.
+- **Words per minute and accuracy**, per drill and while practising.
+- **Reverse lookup.** Search the dictionary by word *or* by stroke and see the
+  chord painted onto the keyboard. "How do I write this?" has an answer.
+- **Any language.** A language is a folder of files (`layout.toml` +
+  `dict.json`). Add one without recompiling. Ships with `en-beginner` and
+  `ja-beginner`.
+- **Two output destinations.** Type into anysteno's own page, or inject into
+  whatever application is focused.
 - **Customisable dictionaries.** Drop a `user.json` next to any pack to override
   or add entries; your edits never touch the shipped files.
 - **Fast & tiny.** Pure-Rust core, single self-contained binary, no runtime.
+
+## The app
+
+Four screens, in the sidebar:
+
+| Screen | What it's for |
+|---|---|
+| **Learn** | The generated lesson plan, and the drill that runs it. Shows the target word, the chord that writes it, and your score. |
+| **Practice** | A free page to write on, with a live feed of stroke → result. This is the only screen that can type into other applications. |
+| **Dictionary** | Search by word or by stroke; the result's chord is drawn on the keyboard. |
+| **Settings** | Language, hints, theme, and anything that failed to load. |
+
+The drill is deliberately forgiving: a wrong answer never advances and never
+ends the run, it just reveals the chord on the keyboard. Recalling a chord is
+the hard part of steno, and hiding the answer after a miss only stalls you.
 
 ## How steno works here
 
@@ -42,6 +65,12 @@ count as one chord.
 A stroke is written in *steno order* using the pack's key letters, e.g. holding
 the keys for `K`, `A`, `T` makes the stroke **`KAT`** → `cat`. Chords with no
 vowel get a hyphen to separate the two hands (e.g. `S` + `-T` → `S-T`).
+
+Steno order also means a stroke is **not** spelled the way the English word is.
+The right-hand bank runs `F R P B L G T S D Z`, so the keys for "s" and "t"
+always come out as `-TS`, never `-ST`. A dictionary entry whose letters run
+against that order can never be typed, no matter which keys you hold — the
+shipped packs are checked against this at build time.
 
 ### Default English layout (beginner)
 
@@ -83,7 +112,7 @@ release binary is a single file at `target/release/anysteno`.
 | OS | Global capture / injection needs |
 |----|----------------------------------|
 | Linux (X11) | works out of the box |
-| Linux (Wayland) | global capture is limited by the compositor; in-app mode always works |
+| Linux (Wayland) | global capture is limited by the compositor; typing into anysteno always works |
 | macOS | grant **Accessibility** permission to capture and inject |
 | Windows | works; no special permission |
 
@@ -105,20 +134,23 @@ my-lang/
   user.json     # optional overrides (wins over dict.json)
 ```
 
-Copy `en-beginner` as a starting point, edit the files, restart, and pick your
-language from the dropdown. To just add words, create `user.json` in an existing
-pack:
+Copy `en-beginner` as a starting point, edit the files, then press **Reload
+packs** in Settings. Anything that fails to parse is reported there rather than
+silently ignored. To just add words, create `user.json` in an existing pack:
 
 ```json
 { "KAT": "kitty", "TPHU": "new word" }
 ```
 
+Your new words are picked up by the lesson generator, the dictionary search and
+the keyboard view automatically — there is nothing else to update.
+
 ## Limitations (this version)
 
-- **System-wide keys are not suppressed yet.** In system-wide mode the raw
-  letters still reach the focused app *in addition* to the injected translation.
-  True suppression needs per-OS grab APIs (Windows/macOS hooks, Linux uinput);
-  it is planned. In-app mode is unaffected and fully usable.
+- **System-wide keys are not suppressed yet.** When typing into other apps the
+  raw letters still reach them *in addition* to the injected translation. True
+  suppression needs per-OS grab APIs (Windows/macOS hooks, Linux uinput); it is
+  planned. Typing into anysteno is unaffected and fully usable.
 - **Japanese needs a CJK font.** anysteno auto-loads Noto Sans CJK / system CJK
   fonts if present; otherwise kana render as boxes. Install Noto Sans CJK.
 - **Wayland** global capture depends on the compositor.
@@ -128,17 +160,20 @@ pack:
 Three layers; the brain has no OS dependencies and is fully unit-tested.
 
 ```
-app (egui)        GUI, toggles, live view, output routing
+app (egui)        screens, input routing, output routing
 platform          rdev (capture)  ·  enigo (inject)  — thin OS shims
 steno-core        chord → stroke → dictionary → engine   (pure, tested)
+                  + curriculum · reverse index · stats
 ```
 
-See [`DESIGN.md`](DESIGN.md) for the full design.
+Lessons, reverse lookup and scoring all live in the pure core, so they are
+decided without a screen and covered by unit tests. See [`DESIGN.md`](DESIGN.md)
+for the full design.
 
 ## Development
 
 ```sh
-nix-shell --run 'cargo test'      # 36 core unit tests
+nix-shell --run 'cargo test'      # 93 unit tests
 nix-shell --run 'cargo clippy --all-targets'
 ```
 
