@@ -18,6 +18,8 @@
 //!   [dictionary] stroke(s) -> output text (greedy longest match)
 //!         │
 //!   [engine]     ties it together, produces translations for the app
+//!         │
+//!   [format]     Plover translation language -> rendered text + typing delta
 //! ```
 //!
 //! A **language pack** ([`Pack`]) bundles a [`Layout`] + [`Dictionary`] + meta.
@@ -47,6 +49,7 @@ pub mod chord;
 pub mod defaults;
 pub mod dictionary;
 pub mod engine;
+pub mod format;
 pub mod layout;
 pub mod lesson;
 pub mod pack;
@@ -57,6 +60,7 @@ pub mod stroke;
 pub use chord::ChordAccumulator;
 pub use dictionary::{Dictionary, Translation, Translator};
 pub use engine::{Engine, EngineOutput, KeyEvent};
+pub use format::{format, Formatter, Output};
 pub use layout::Layout;
 pub use lesson::{Curriculum, Drill, DrillOutcome, Lesson, LessonItem};
 pub use pack::{Pack, PackError};
